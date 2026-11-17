@@ -1,0 +1,256 @@
+ELECTRON IPC DEMO: HOW THE APP COMMUNICATES
+============================================
+Date: 22 October 2026
+
+
+1. OVERVIEW
+-----------
+This is a working Electron desktop app with a React interface. It shows a
+main process (the parent) running one or more child Node.js processes, with
+messages flowing both ways between them through Electron's IPC
+(Inter-Process Communication).
+
+The app shows each requirement directly:
+
+  - Multiple processes: one main process plus any number of child Node.js
+    processes, started and stopped from the UI.
+  - Parent to child: the main process sends messages and work requests to a
+    chosen child.
+  - Child to parent: each child replies to requests, and also sends messages
+    on its own (a "ready" message when it starts and a heartbeat every
+    10 seconds).
+  - Visibility: a live message log in the window shows every hop (sender,
+    receiver, content), so you can watch the communication as it happens.
+
+The app was tested end to end. Messages travelled both ways, two children
+ran at the same time, and a heavy computation in a child returned the
+correct result while the window stayed responsive.
+
+
+2. ARCHITECTURE
+---------------
+The app runs three kinds of process, with the main process in the middle.
+The React UI reaches Main only through a small preload bridge, and each
+child is a separate Node.js process.
+
+  +-----------------------+           +--------------------------+           +-------------------------+
+  | React UI (renderer)   |  request  | Main process (parent)    |  request  | Child process #1        |
+  | src/App.jsx           | --------> | electron/main.js         | --------> | electron/worker.js      |
+  | Buttons, message log  |           |                          | <-------- | Its own Node.js process |
+  | No direct Node access |   push    | - Opens the window       |   reply   +-------------------------+
+  |                       | <-------- | - Starts/stops children  |
+  |  +-----------------+  |           | - Routes every message   | --------> +-------------------------+
+  |  | preload.js      |  |           | - Tracks children in a   |           | Child process #2        |
+  |  | window.api      |  |           |   Map (id -> process)    | <-------- | electron/worker.js      |
+  |  +-----------------+  |           |                          |           +-------------------------+
+  +-----------------------+           +--------------------------+             + more on demand
+
+  UI <-> Main:    ipcRenderer.invoke -> ipcMain.handle; Main pushes with webContents.send
+  Main <-> Child: child.postMessage -> parentPort "message" event; replies via parentPort.postMessage
+
+The UI never talks to a child directly. It asks Main, and Main forwards the
+message to the right child by its ID.
+
+
+3. HOW THE COMMUNICATION WORKS
+------------------------------
+All communication goes through the main process, which acts as a hub. There
+are two links: UI <-> Main uses Electron's ipcRenderer / ipcMain, and
+Main <-> Child uses Electron's utilityProcess message channel. Each link
+carries messages in both directions, which gives four channels.
+
+  Direction      Sender calls                          Receiver listens with
+  -------------  ------------------------------------  ------------------------------------------
+  UI -> Main     ipcRenderer.invoke(channel, data)     ipcMain.handle(channel, fn)
+  Main -> UI     win.webContents.send('log', data)     ipcRenderer.on('log', fn)
+  Main -> Child  child.postMessage(data)               process.parentPort.on('message', e => e.data)
+  Child -> Main  process.parentPort.postMessage(data)  child.on('message', fn)
+
+  What each channel is used for:
+  - UI -> Main:    button actions (start/stop a child, send a message, ping)
+  - Main -> UI:    pushing log entries and the list of running children
+  - Main -> Child: forwarding a message or a job to a specific child
+  - Child -> Main: replies, results, and messages the child sends on its own
+
+
+3.1 UI to Main (request and response)
+
+The UI calls a function on window.api, which the preload script turns into
+ipcRenderer.invoke. The main process answers in a matching ipcMain.handle.
+invoke returns a Promise, so the UI can "await" the answer.
+
+    // preload.js
+    sendToChild: (id, message) => ipcRenderer.invoke('child:send', id, message)
+
+    // main.js
+    ipcMain.handle('child:send', (_event, id, message) => {
+      children.get(id).postMessage(message);
+      return true;
+    });
+
+
+3.2 Main to UI (push events)
+
+The main process pushes updates to the window without being asked. The UI
+subscribes once when it loads.
+
+    // main.js
+    win.webContents.send('log', { from, to, message, time: Date.now() });
+
+    // App.jsx
+    useEffect(() => window.api.onLog((entry) => setLogs((prev) => [entry, ...prev])), []);
+
+
+3.3 Main to Child
+
+The main process starts each child with utilityProcess.fork('worker.js').
+This is Electron's API for starting a separate Node.js process. It then
+sends plain objects to the child.
+
+    // main.js
+    const child = utilityProcess.fork(path.join(__dirname, 'worker.js'));
+    child.postMessage({ type: 'greet', text: 'Hello child!' });
+
+    // worker.js
+    process.parentPort.on('message', (event) => {
+      const message = event.data;   // { type: 'greet', text: 'Hello child!' }
+    });
+
+
+3.4 Child to Main
+
+The child replies through process.parentPort. It can also send messages
+without being asked, such as its startup message and heartbeat.
+
+    // worker.js
+    process.parentPort.postMessage({ type: 'reply', text: 'Hi! Child #1 received: "Hello child!"' });
+
+    // main.js
+    child.on('message', (message) => log(`Child #${id}`, 'Main', message));
+
+
+4. END-TO-END EXAMPLE: ONE MESSAGE ROUND TRIP
+---------------------------------------------
+When the user types "Hello child!" and clicks "Send message", the message
+makes four hops and the reply appears in the log almost at once. All four
+hops were confirmed in testing.
+
+  1. UI -> Main. React calls
+       window.api.sendToChild(1, { type: 'greet', text: 'Hello child!' })
+     The preload script sends it with ipcRenderer.invoke('child:send', ...).
+
+  2. Main -> Child. ipcMain.handle('child:send') looks up child #1 and
+     calls child.postMessage(message).
+
+  3. Child -> Main. In worker.js, parentPort.on('message') sees
+     type 'greet' and replies with
+       { type: 'reply', text: 'Hi! Child #1 received: "Hello child!"' }
+
+  4. Main -> UI. child.on('message') receives the reply and forwards it with
+     webContents.send('log', ...). React adds it to the message log.
+
+The log shows each hop as its own line with coloured badges
+(blue = UI, orange = Main, green = Child):
+
+    10:41:02  UI       -> Main      {"type":"greet","text":"Hello child!"}
+    10:41:02  Main     -> Child #1  {"type":"greet","text":"Hello child!"}
+    10:41:02  Child #1 -> Main      Hi! Child #1 received: "Hello child!"
+
+The "Heavy task" button uses the same route with
+{ type: 'count-primes', limit: 5000000 }. The child does the work and sends
+back the result, for example "Found 348,513 primes below 5,000,000 in ... ms".
+Meanwhile the window stays fully usable.
+
+
+5. FEATURES IN THE UI
+---------------------
+Each control in the window demonstrates one part of the communication.
+
+  Ping Main
+    The UI asks Main a question and shows the answer (Main's process ID).
+    Demonstrates: UI <-> Main request and response.
+
+  + Start child
+    Main starts a new Node.js process; a new "Child #N" chip appears with
+    its process ID.
+    Demonstrates: multiple child processes.
+
+  Stop selected
+    Main ends the selected child; its chip disappears.
+    Demonstrates: process lifecycle, exit events.
+
+  Send message
+    The text goes UI -> Main -> Child, and the reply comes back.
+    Demonstrates: the full two-way round trip.
+
+  Heavy task: count primes
+    The child runs a slow computation and returns the result.
+    Demonstrates: offloading work; the UI never freezes.
+
+  (automatic)
+    Each child sends "ready" when it starts and a heartbeat every 10 s.
+    Demonstrates: child -> parent messages sent without a request.
+
+  Message log
+    Every hop, with time, sender, receiver and content.
+    Demonstrates: watching the IPC as it happens.
+
+
+6. DESIGN DECISIONS
+-------------------
+  - Secure by default. The window runs with contextIsolation: true and
+    nodeIntegration: false, so the web page has no direct access to Node.js
+    or the file system. The preload script exposes only six named functions
+    through contextBridge (pingMain, startChild, stopChild, sendToChild,
+    onLog, onChildrenChanged). This follows Electron's security guidance.
+
+  - Main process as the hub. All messages pass through Main, so one place
+    controls which child receives what. Main also tracks every running child
+    in a Map keyed by child ID, which makes it easy to send to or stop a
+    specific child.
+
+  - utilityProcess for children. Electron's utilityProcess.fork() starts a
+    real, separate Node.js process with a built-in message channel to its
+    parent. This is Electron's recommended way to run background Node work.
+
+  - Isolation and responsiveness. Slow work runs in a child, so neither the
+    UI nor the main process is blocked. If a child crashes, Main receives an
+    exit event and the rest of the app keeps running.
+
+  - Simple message format. Every message is a plain JavaScript object with a
+    "type" field (greet, count-primes, reply, result, ready, heartbeat). The
+    receiver checks "type" to decide what to do, which keeps adding new
+    message types easy.
+
+  - Clean shutdown. When the window closes, Main ends every child before
+    quitting, so no background processes are left running.
+
+
+7. RUNNING THE APP AND PROJECT STRUCTURE
+----------------------------------------
+You need Node.js installed. From the project folder, run:
+
+    npm install
+    npm start
+
+"npm start" builds the React UI with Vite into dist/, then opens the
+Electron window. One child process starts automatically.
+
+  File                                  Runs in                     Responsibility
+  ------------------------------------  --------------------------  ---------------------------------------------
+  electron/main.js                      Main process                Creates the window, starts and stops children,
+                                                                    routes all messages
+  electron/preload.js                   Renderer (before the page)  Safe bridge: exposes window.api to React
+  electron/worker.js                    Child process               Handles messages, runs the heavy task,
+                                                                    sends heartbeats
+  src/App.jsx                           Renderer                    React UI: buttons, child list, message log
+  src/main.jsx, src/styles.css,         Renderer                    React entry point, styling, page shell
+  index.html
+  package.json, vite.config.mjs         Build                       Dependencies, start script, Vite settings
+
+The stack is Electron 45, React 19 and Vite 8, with no other runtime
+dependencies.
+
+Troubleshooting: if the app runs like plain Node.js instead of opening a
+window, the terminal has the variable ELECTRON_RUN_AS_NODE set. Clear it
+(PowerShell: Remove-Item Env:ELECTRON_RUN_AS_NODE) and run "npm start" again.

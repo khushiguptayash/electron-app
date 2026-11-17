@@ -1,0 +1,49 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, 'Segoe UI', sans-serif;
+  background: #f4f5f7;
+  color: #1f2328;
+}
+
+.app { padding: 20px; max-width: 1000px; margin: 0 auto; }
+
+header h1 { margin: 0; font-size: 22px; }
+.flow { margin: 4px 0 16px; color: #57606a; }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.card { background: #fff; border: 1px solid #d8dee4; border-radius: 10px; padding: 14px 16px; }
+.card.wide { grid-column: 1 / -1; }
+.card h2 { margin: 0 0 8px; font-size: 15px; }
+.card p { margin: 0 0 10px; font-size: 13px; }
+
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.children { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; min-height: 32px; }
+.muted { color: #6e7781; font-size: 13px; }
+
+button {
+  border: 1px solid #1f6feb; background: #1f6feb; color: #fff;
+  padding: 7px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
+}
+button:hover:not(:disabled) { filter: brightness(1.1); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.danger { background: #cf222e; border-color: #cf222e; }
+button.ghost { background: transparent; color: #1f6feb; }
+button.chip { background: #fff; color: #1f2328; border-color: #d8dee4; }
+button.chip.active { background: #ddf4ff; border-color: #1f6feb; }
+button.chip small { color: #6e7781; }
+
+input { flex: 1; min-width: 180px; padding: 7px 10px; border: 1px solid #d8dee4; border-radius: 6px; font-size: 13px; }
+
+.log { margin-top: 12px; }
+.log-head { display: flex; justify-content: space-between; align-items: center; }
+.log ul { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; font-family: Consolas, monospace; font-size: 12px; }
+.log li { display: flex; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid #f0f1f3; }
+.time { color: #8c959f; }
+.arrow { color: #8c959f; }
+.msg { overflow-wrap: anywhere; }
+.tag { padding: 1px 7px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
+.tag.ui { background: #ddf4ff; color: #0550ae; }
+.tag.main { background: #fff1e5; color: #953800; }
+.tag.child { background: #dafbe1; color: #116329; }
