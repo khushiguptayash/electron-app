@@ -1,41 +1,61 @@
+/* Include borders and padding inside every element's declared width. */
 * { box-sizing: border-box; }
 
+/* Style the full document body and default text. */
 body {
+  /* Remove the browser's default page margin. */
   margin: 0;
+  /* Use the operating-system UI font family. */
   font-family: system-ui, 'Segoe UI', sans-serif;
+  /* Apply a light gray application background. */
   background: #f4f5f7;
+  /* Apply a dark gray default text color. */
   color: #1f2328;
 }
 
+/* Center and constrain the application content. */
 .app { padding: 20px; max-width: 1000px; margin: 0 auto; }
 
+/* Format the application title and flow description. */
 header h1 { margin: 0; font-size: 22px; }
 .flow { margin: 4px 0 16px; color: #57606a; }
 
+/* Define the responsive card grid and card appearance. */
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .card { background: #fff; border: 1px solid #d8dee4; border-radius: 10px; padding: 14px 16px; }
 .card.wide { grid-column: 1 / -1; }
 .card h2 { margin: 0 0 8px; font-size: 15px; }
 .card p { margin: 0 0 10px; font-size: 13px; }
 
+/* Lay out inline controls and child-selection chips. */
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .children { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; min-height: 32px; }
 .muted { color: #6e7781; font-size: 13px; }
 
+/* Style primary buttons and their interactive states. */
 button {
   border: 1px solid #1f6feb; background: #1f6feb; color: #fff;
   padding: 7px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
 }
+/* Brighten an enabled button when it is hovered. */
 button:hover:not(:disabled) { filter: brightness(1.1); }
+/* Dim and block pointer action for disabled buttons. */
 button:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Give stop actions a red appearance. */
 button.danger { background: #cf222e; border-color: #cf222e; }
+/* Render clear actions as blue text without a filled background. */
 button.ghost { background: transparent; color: #1f6feb; }
+/* Render child chips as bordered white buttons. */
 button.chip { background: #fff; color: #1f2328; border-color: #d8dee4; }
+/* Highlight the currently selected child chip. */
 button.chip.active { background: #ddf4ff; border-color: #1f6feb; }
+/* Mutate the PID text inside a child chip. */
 button.chip small { color: #6e7781; }
 
+/* Style the greeting text input and let it fill available row space. */
 input { flex: 1; min-width: 180px; padding: 7px 10px; border: 1px solid #d8dee4; border-radius: 6px; font-size: 13px; }
 
+/* Style the log card, header, scrolling list, and entries. */
 .log { margin-top: 12px; }
 .log-head { display: flex; justify-content: space-between; align-items: center; }
 .log ul { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; font-family: Consolas, monospace; font-size: 12px; }

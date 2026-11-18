@@ -1,12 +1,21 @@
+<!-- Declare standards mode and identify this document as HTML. -->
 <!doctype html>
+<!-- Set the document language to English. -->
 <html lang="en">
+  <!-- Store metadata and browser configuration for the page. -->
   <head>
+    <!-- Encode all page text as UTF-8. -->
     <meta charset="UTF-8" />
+    <!-- Restrict loaded resources to the app and permit inline style attributes. -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <!-- Set the browser and desktop-window title text. -->
     <title>Electron IPC Demo</title>
   </head>
+  <!-- Contain the visible DOM that React will populate. -->
   <body>
+    <!-- Provide the mount element read by src/main.jsx. -->
     <div id="root"></div>
+    <!-- Load the React entry module through Vite. -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
